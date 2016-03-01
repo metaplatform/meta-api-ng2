@@ -1,0 +1,35 @@
+{
+  "name": "meta-api-ng2",
+  "version": "1.0.0",
+  "description": "META API client for Angular2",
+  "main": "lib/index.ts",
+  "typings": "lib/index.d.ts",
+  "scripts": {
+    "tsc": "tsc",
+    "prepublish": "rm -rf lib && tsc -p src",
+    "typings": "typings"
+  },
+  "keywords": [
+    "meta-api",
+    "meta-connector",
+    "meta-platform",
+    "metaplatform",
+    "angular2"
+  ],
+  "author": "META Platform team <www.meta-platform.com>",
+  "license": "ISC",
+  "dependencies": {
+    "crypto-js": "^3.1.6",
+    "angular2": "^2.0.0-beta.7",
+    "es6-promise": "^3.0.2",
+    "es6-shim": "^0.33.3",
+    "reflect-metadata": "0.1.2",
+    "rxjs": "5.0.0-beta.2",
+    "systemjs": "0.19.22",
+    "zone.js": "0.5.15"
+  },
+  "devDependencies": {
+    "typescript": "^1.7.3",
+    "typings": "^0.6.8"
+  }
+}
