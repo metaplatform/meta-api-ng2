@@ -11,7 +11,8 @@ import {ApiConnector} from './connector';
 import CryptoJS = require("crypto-js");
 
 export interface SubscriptionInterface {
-	unsubscribe: Function
+	channel: string;
+	unsubscribe: Function;
 }
 
 export class ApiClient extends EventEmitter {
@@ -24,6 +25,32 @@ export class ApiClient extends EventEmitter {
 	constructor(){
 		
 		super();
+
+		this.connection = new ApiConnector((channel, message) => {
+
+			return this.handleMessage(channel, message);
+
+		}, (queue, message) => {
+
+			return this.handleQueueMessage(queue, message);
+
+		});
+
+		this.connection.on("open", (session) => {
+			this.emit("open", session);
+		});
+
+		this.connection.on("error", (err) => {
+			this.emit("error", err);
+		});
+
+		this.connection.on("reconnect", (err) => {
+			this.emit("reconnect", err);
+		});
+
+		this.connection.on("disconnect", (err) => {
+			this.emit("disconnect", err);
+		});
 
 	}
 
@@ -70,31 +97,6 @@ export class ApiClient extends EventEmitter {
 		return new Promise((resolve, reject) => {
 
 			try {
-
-				if (this.connection)
-					return reject(new Error("API client already connected."));
-
-				this.connection = new ApiConnector((channel, message) => {
-
-					return this.handleMessage(channel, message);
-
-				}, (queue, message) => {
-
-					return this.handleQueueMessage(queue, message);
-
-				});
-
-				this.connection.on("open", (session) => {
-					this.emit("open", session);
-				})
-
-				this.connection.on("error", (err) => {
-					this.emit("error", err);
-				})
-
-				this.connection.on("reconnect", (err) => {
-					this.emit("reconnect", err);
-				})
 
 				this.connection.connect(brokerUrl, credentials).then(resolve, reject);
 
@@ -166,14 +168,18 @@ export class ApiClient extends EventEmitter {
 				if (!this.connection)
 					return reject(new Error("API client not connected."));
 
+				if (!this.subscriptions[channel])
+					this.subscriptions[channel] = [];
+
+				this.subscriptions[channel].push(cb);
+
 				this.connection.subscribe(channel).then(() => {
 
-					if (!this.subscriptions[channel])
-						this.subscriptions[channel] = [];
-
-					this.subscriptions[channel].push(cb);
+					if (this.subscriptions[channel].indexOf(cb) < 0)
+						return reject("Already unsubscribed.");
 
 					resolve({
+						channel: channel,
 						unsubscribe: () => {
 							return this.unsubscribe(channel, cb);
 						}
@@ -201,7 +207,7 @@ export class ApiClient extends EventEmitter {
 				if (!this.connection)
 					return reject(new Error("API client not connected."));
 
-				if (!this.subscriptions[channel])
+				if (!this.subscriptions[channel] || this.subscriptions[channel]  instanceof Promise)
 					return resolve();
 
 				var i = this.subscriptions[channel].indexOf(cb);
@@ -400,7 +406,24 @@ export function createBasicCredentials(username: string, password: string) {
 	var hash = CryptoJS.SHA256(username + ":" + password).toString();
 	var token = CryptoJS.SHA256(username + hash + timestr);
 
-	//console.log("PWD HASH", hash);
+	return {
+		username: username,
+		token: token.toString()
+	};
+
+}
+
+export function createBasicCredentialsHash(username: string, password: string){
+
+	return CryptoJS.SHA256(username + ":" + password).toString();
+
+}
+
+export function createBasicCredentialsFromHash(username: string, hash: string) {
+
+	var now = new Date();
+	var timestr = now.getFullYear() + ":" + now.getMonth() + ":" + now.getDate() + ":" + now.getHours();
+	var token = CryptoJS.SHA256(username + hash + timestr);
 
 	return {
 		username: username,

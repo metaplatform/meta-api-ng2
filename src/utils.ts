@@ -41,6 +41,21 @@ var clone = function(obj) {
 
 };
 
+var empty2null = function(data){
+
+    var r = {};
+
+    for (var i in data)
+        if (data[i] == "")
+            r[i] = null;
+        else
+            r[i] = data[i];
+
+    return r;
+
+};
+
 export var Utils = {
-	clone: clone
+	clone: clone,
+    empty2null: empty2null
 }

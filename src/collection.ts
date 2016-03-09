@@ -23,17 +23,42 @@ export class ApiCollection {
 	public pages = [];
 	public page = 0;
 
+	private appendMode: boolean = false;
+	private clearRecords: boolean = false;
+
+	public loaded = false;
+
 	private liveHandler = null;
 
+	private initialized = false;
+	private queryCache: string;
+
 	constructor(private client: ApiClient, private service: string, private endpoint: string){
+
+		this.client.on("open", () => {
+
+			if (this.initialized){
+				
+				this.clearRecords = true;
+
+				if (this.liveHandler)
+					this.liveHandler.unsubscribe();
+
+				this.fetchRecords();
+
+			}
+
+		})
 
 	}
 
 	private applyUpdate(update: any){
 		
+		update.record["$imported"] = (new Date()).getTime();
+			
 		switch(update.op){
 			case 'insert':
-				this.records.push(update.record);
+				this.records.unshift(update.record);
 				this.index[(update.record._id ? update.record._id : this.records.length)] = update.record;
 				this.count++;
 				this.total++;
@@ -44,7 +69,7 @@ export class ApiCollection {
 					for (var i in update.record)
 						this.index[update.record._id][i] = update.record[i];
 				} else {
-					this.records.push(update.record);
+					this.records.unshift(update.record);
 					this.index[(update.record._id ? update.record._id : this.records.length)] = update.record;
 					this.count++;
 					this.total++;
@@ -70,25 +95,54 @@ export class ApiCollection {
 
 	}
 
-	private fetchRecords(){
-
-		if (this.liveHandler)
-			this.liveHandler.unsubscribe();
+	private createQuery(withPagination: boolean = true){
 
 		var query = {
 			properties: this.properties,
 			where: this.where,
 			sort: this.sort,
-			skip: this.skip,
-			limit: this.limit
+			skip: null,
+			limit: null
 		};
+
+		if (withPagination){
+			query.skip = this.skip;
+			query.limit = this.limit;
+		}
+
+		return query;
+
+	}
+
+	private fetchRecords(){
+
+		this.loaded = false;
+
+		if (this.liveHandler)
+			this.liveHandler.unsubscribe();
+
+		var query = this.createQuery();
+		var liveQuery = this.createQuery(false);
 
 		this.client.call(this.service, this.endpoint, "query", query).then((res) => {
 
-			this.records = res.records;
-			this.index = {};
-			this.count = res.count;
+			if (this.clearRecords) {
+				this.records = [];
+				this.index = {};
+				this.count = 0;
+			}
+
+			if (this.appendMode && this.records instanceof Array) {
+				this.records = this.records.concat(res.records);
+				this.count += res.count;
+			} else {
+				this.records = res.records;
+				this.count = res.count;
+				this.index = {};
+			}
+
 			this.total = res.total;
+			this.clearRecords = false;
 
 			this.pages = [];
 			this.page = Math.ceil(this.skip / this.limit);
@@ -97,14 +151,14 @@ export class ApiCollection {
 				this.pages.push(p);
 
 			for (var i in res.records)
-				this.index[(res.records[i]._id ? res.records[i]._id : i ) ] = res.records[i];
+				this.index[(res.records[i]._id ? res.records[i]._id : i)] = res.records[i];
+
+			this.loaded = true;
 
 			//Fetch live endpoint
-			this.client.call(this.service, this.endpoint, "live", query).then((res) => {
+			this.client.call(this.service, this.endpoint, "live", liveQuery).then((res) => {
 
-				var channelName = res.service + ":/" + res.endpoint + "#" + res.id;
-
-				this.client.subscribe(channelName, (update) => {
+				this.client.subscribe(res.toString(), (update) => {
 
 					this.applyUpdate(update);
 
@@ -113,16 +167,28 @@ export class ApiCollection {
 					this.liveHandler = handler;
 
 				}, (err) => {
-					console.error("Collection LIVE subscription error:", err);	
+					console.error("Collection LIVE subscription error:", err);
 				})
 
 			}, (err) => {
-				console.error("Collection LIVE error:", err);	
+				console.error("Collection LIVE error:", err);
+
 			})
 
 		}, (err) => {
 			console.error("Collection error:", err);
-		})
+		});
+
+	}
+
+	private fetchIfChanged(){
+
+		var cache = JSON.stringify(this.createQuery());
+
+		if (this.queryCache == cache) return;
+
+		this.queryCache = cache;
+		this.fetchRecords();
 
 	}
 
@@ -133,44 +199,81 @@ export class ApiCollection {
 		this.sort = sort;
 		this.limit = limit;
 
+		this.initialized = true;
+
 		this.fetchRecords();
+
+	}
+
+	public destroy(){
+
+		if (this.liveHandler)
+			this.liveHandler.unsubscribe();
 
 	}
 
 	public setWhere(where: Object){
 		
+		this.clearRecords = true;
+		this.skip = 0;
 		this.where = where;
-		this.fetchRecords();
+
+
+		this.fetchIfChanged();
 
 	}
 
 	public setSort(sort: Object) {
 
+		this.clearRecords = true;
 		this.sort = sort;
-		this.fetchRecords();
+		this.skip = 0;
+
+		this.fetchIfChanged();
 
 	}
 
 	public setProperties(properties: Array<String>) {
 
+		this.clearRecords = true;
 		this.properties = properties;
-		this.fetchRecords();
+		this.skip = 0;
+
+		this.fetchIfChanged();
 
 	}
 
 	public setPagination(skip: number, limit: number){
 
+		this.clearRecords = true;
 		this.skip = skip;
 		this.limit = limit;
 		
-		this.fetchRecords();
+		this.fetchIfChanged();
 
 	}
 
 	public setPage(num: number){
 
+		this.clearRecords = true;
 		this.skip = num * this.limit;
-		this.fetchRecords();
+		this.fetchIfChanged();
+
+	}
+
+	public loadMore(){
+
+		this.page += 1;
+		this.skip = this.page * this.limit;
+
+		if(this.skip < this.total)
+			this.fetchIfChanged();
+
+	}
+
+	public setAppend(val: boolean){
+
+		this.appendMode = val;
 
 	}
 

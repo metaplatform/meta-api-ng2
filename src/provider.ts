@@ -10,6 +10,7 @@ import {ApiClient} from './client';
 import {ApiStorage} from './storage';
 
 import {ApiCollection} from './collection';
+import {ApiRecord} from './record';
 
 @Injectable()
 export class ApiProvider {
@@ -19,27 +20,18 @@ export class ApiProvider {
 	public serverUrl: string;
 	public session: Object;
 
+	public connected: boolean = false;
+
 	constructor() {
 
 		this.client = new ApiClient();
 		this.storage = new ApiStorage();
 
-	}
-
-	public connect(serverUrl: string, credentials: Object){
-
-		this.serverUrl = serverUrl;
-
-		this.client.connect("ws://" + this.serverUrl + "/cube/v1", credentials).then((session) => {
-			this.session = session;
-			console.log("Connected.");
-		}, (err) => {
-			console.error("Error connecting to API:", err);
-		})
-
 		this.client.on("open", (session) => {
-			
-			this.storage.setSession("http://" + this.serverUrl + "/cube/storage", session.sessionId);
+
+			this.connected = true;
+			this.session = session;
+			this.storage.setSession("http://" + this.serverUrl + "/storage/v1", session.sessionId);
 
 			console.log("Session", session);
 
@@ -53,11 +45,29 @@ export class ApiProvider {
 			console.error("API reconnecting:", err);
 		});
 
+		this.client.on("disconnect", () => {
+			this.connected = false;
+		});
+
+	}
+
+	public connect(serverUrl: string, credentials: Object){
+
+		this.serverUrl = serverUrl;
+
+		return this.client.connect("ws://" + this.serverUrl + "/meta/v1", credentials);
+
 	}
 
 	public getCollection(service: string, endpoint: string){
 
 		return new ApiCollection(this.client, service, endpoint);
+
+	}
+
+	public getRecord(service: string, endpoint: string, id: string = null, initialData: Object = null) {
+
+		return new ApiRecord(this.client, service, endpoint, id, initialData);
 
 	}
 

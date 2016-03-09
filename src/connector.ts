@@ -10,6 +10,14 @@ import {Utils} from './utils';
 import {PROTOCOL} from './protocol';
 import {ApiReference, ChannelReference, StorageReference} from './types';
 
+export class ApiError extends Error {
+
+	constructor(public message: string, public code: number){
+		super(message);
+	}
+
+}
+
 export class ApiConnector extends EventEmitter {
 
 	private activeSubscriptions = [];
@@ -67,8 +75,11 @@ export class ApiConnector extends EventEmitter {
 
 			this.sendRequest(PROTOCOL.commands.auth, this.credentials, (err, session) => {
 
-				if(err)
+				if(err){
+					this.close();
 					this.emit("connectionError", err);
+					return;
+				}
 
 				//Subscribe active channels					
 				var tasks = [];
@@ -103,6 +114,8 @@ export class ApiConnector extends EventEmitter {
 
 			this.connected = false;
 			this.ws = null;
+
+			this.emit("disconnect");
 
 			if (ev.code == 1006 && this.reconnect) {
 
@@ -292,10 +305,10 @@ export class ApiConnector extends EventEmitter {
 					return;
 
 				case PROTOCOL.commands.response:
-					this.handleResponse(data.r, null, data.d);
+					this.handleResponse(data.r, null, data.d, data.t);
 					return;
 				case PROTOCOL.commands.error:
-					this.handleResponse(data.r, new Error(data.e.message));
+					this.handleResponse(data.r, new ApiError(data.e.message, data.e.code));
 					return;
 
 				case PROTOCOL.commands.cliCall:
