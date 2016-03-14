@@ -188,6 +188,15 @@ export class ApiConnector extends EventEmitter {
 
 	};
 
+	public forceReconnect(){
+
+		if (!this.brokerUrl || !this.credentials)
+			throw new Error("Connection not set up.");
+		
+		this.createConnection();
+
+	}
+
 	/*
 	 * Closes connection
 	 */

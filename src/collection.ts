@@ -6,8 +6,9 @@
  */
 
 import {ApiClient} from './client';
+import {EventEmitter} from './events';
 
-export class ApiCollection {
+export class ApiCollection extends EventEmitter {
 
 	private properties: Array<String> = [];
 	private where: Object = {};
@@ -15,8 +16,8 @@ export class ApiCollection {
 	private skip: number = 0;
 	private limit: number = null;
 
-	public records: Array<Object>;
-	public index: Object;
+	public records: Array<Object> = [];
+	public index: any = {};
 	public count: number = 0;
 	public total: number = 0;
 
@@ -24,6 +25,7 @@ export class ApiCollection {
 	public page = 0;
 
 	private appendMode: boolean = false;
+	private liveMode: boolean = true;
 	private clearRecords: boolean = false;
 
 	public loaded = false;
@@ -35,6 +37,8 @@ export class ApiCollection {
 
 	constructor(private client: ApiClient, private service: string, private endpoint: string){
 
+		super();
+
 		this.client.on("open", () => {
 
 			if (this.initialized){
@@ -44,6 +48,9 @@ export class ApiCollection {
 				if (this.liveHandler)
 					this.liveHandler.unsubscribe();
 
+				if(this.appendMode)
+					this.skip = 0;
+
 				this.fetchRecords();
 
 			}
@@ -52,46 +59,149 @@ export class ApiCollection {
 
 	}
 
+	private genAnonId(){
+
+		return (new Date()).getTime() + ":" + Math.random();
+
+	}
+
+	private updateRecord(record: any, data: any){
+
+		for (var i in data)
+			record[i] = data[i];
+
+	}
+
+	private updateRecords(records: any, clear: boolean){
+
+		var now = (new Date()).getTime();
+
+		if (clear)
+			this.index = {};
+
+		//Update index
+		for (var i in records){
+
+			var _id = (records[i]._id ? records[i]._id : this.genAnonId());
+
+			records[i]["$__ref"] = _id;
+
+			if (this.index[_id])
+				this.updateRecord(this.index[_id], records[i]);
+			else
+				this.index[_id] = records[i];
+
+			this.index[_id]["$__loaded"] = now;
+
+		}
+
+		//Remove old indexed values
+		if(clear)
+			for (var j in this.index)
+				if (this.index[j]._deleted)
+					this.index[j] = { _deleted: true }
+				else if (this.index[j]["$__loaded"] != now)
+					delete this.index[j];
+
+		//Resort array
+		var newRecords = (clear ? [] : this.records);
+
+		for (var k in records){
+			
+			newRecords.push(this.index[ records[k]["$__ref"] ]);
+
+		}
+
+		//Flop
+		this.records = newRecords;
+
+	}
+
 	private applyUpdate(update: any){
 		
-		update.record["$imported"] = (new Date()).getTime();
+		//console.log("COLL LIVE UPDATE", update);
+
+		//Get id
+		var _id = (update.record._id ? update.record._id : this.genAnonId());
+		var now = (new Date()).getTime();
+
+		//Set imported
+		update.record["$__imported"] = now;
 			
-		switch(update.op){
-			case 'insert':
-				this.records.unshift(update.record);
-				this.index[(update.record._id ? update.record._id : this.records.length)] = update.record;
+		var removeRecord = () => {
+
+			if (this.index[_id]) {
+
+				if (this.index[_id]._deleted) return;
+
+				var d = this.records.indexOf(this.index[_id]);
+
+				if (d >= 0)
+					this.records.splice(d, 1);
+
+				this.count--;
+
+			}
+
+			this.index[_id]._deleted = true;
+
+			this.total--;
+
+		};
+
+		var updateRecord = () => {
+
+			//Update
+			if (this.index[_id] && !this.index[_id]._deleted) {
+				
+				this.updateRecord(this.index[_id], update.record);
+
+			//Re-insert
+			} else if (this.index[_id] && this.index[_id]._deleted) {
+				
+				this.updateRecord(this.index[_id], update.record);
+				this.index[_id]["$__loaded"] = now;
+
+				this.records.unshift(this.index[_id]);
+
 				this.count++;
 				this.total++;
+
+			//Insert
+			} else {
+
+				update.record["$__ref"] = _id;
+				this.index[_id] = update.record;
+				this.index[_id]["$__loaded"] = now;
+
+				this.records.unshift( this.index[_id] );
+
+				this.count++;
+				this.total++;
+
+			}
+
+		};
+
+		switch(update.op){
+			case 'insert':
+				updateRecord();
 				break;
 
 			case 'update':
-				if(update.record._id && this.index[update.record._id]){
-					for (var i in update.record)
-						this.index[update.record._id][i] = update.record[i];
-				} else {
-					this.records.unshift(update.record);
-					this.index[(update.record._id ? update.record._id : this.records.length)] = update.record;
-					this.count++;
-					this.total++;
-				}
+				if (update.record._deleted)
+					removeRecord();
+				else
+					updateRecord();
 				break;
 
 			case 'delete':
-				if (update.record._id && this.index[update.record._id]) {
-					var d = this.records.indexOf(this.index[update.record._id]);
-
-					if (d >= 0)
-						this.records.splice(d, 1);
-
-					delete this.index[update.record._id];
-
-					this.count--;
-				}
-				
-				this.total--;
-
+				removeRecord();
 				break;
+
 		}
+
+		this.emit("update");
 
 	}
 
@@ -126,21 +236,20 @@ export class ApiCollection {
 
 		this.client.call(this.service, this.endpoint, "query", query).then((res) => {
 
+			//Set counts
 			if (this.clearRecords) {
-				this.records = [];
-				this.index = {};
 				this.count = 0;
 			}
 
 			if (this.appendMode && this.records instanceof Array) {
-				this.records = this.records.concat(res.records);
 				this.count += res.count;
 			} else {
-				this.records = res.records;
 				this.count = res.count;
-				this.index = {};
 			}
 
+			this.updateRecords(res.records, this.clearRecords);
+
+			//Set count and update pagination
 			this.total = res.total;
 			this.clearRecords = false;
 
@@ -150,30 +259,30 @@ export class ApiCollection {
 			for (var p = 0; p < Math.ceil(this.total / this.limit); p++)
 				this.pages.push(p);
 
-			for (var i in res.records)
-				this.index[(res.records[i]._id ? res.records[i]._id : i)] = res.records[i];
-
 			this.loaded = true;
 
+			this.emit("update");
+
 			//Fetch live endpoint
-			this.client.call(this.service, this.endpoint, "live", liveQuery).then((res) => {
+			if(this.liveMode)
+				this.client.call(this.service, this.endpoint, "live", liveQuery).then((res) => {
 
-				this.client.subscribe(res.toString(), (update) => {
+					this.client.subscribe(res.toString(), (update) => {
 
-					this.applyUpdate(update);
+						this.applyUpdate(update);
 
-				}).then((handler) => {
+					}).then((handler) => {
 
-					this.liveHandler = handler;
+						this.liveHandler = handler;
+
+					}, (err) => {
+						console.error("Collection LIVE subscription error:", err);
+					})
 
 				}, (err) => {
-					console.error("Collection LIVE subscription error:", err);
+					console.error("Collection LIVE error:", err);
+
 				})
-
-			}, (err) => {
-				console.error("Collection LIVE error:", err);
-
-			})
 
 		}, (err) => {
 			console.error("Collection error:", err);
@@ -274,6 +383,34 @@ export class ApiCollection {
 	public setAppend(val: boolean){
 
 		this.appendMode = val;
+
+	}
+
+	public setLive(val: boolean) {
+
+		this.liveMode = val;
+
+	}
+
+	public getById(id: string){
+
+		return this.index[id] || null;
+
+	}
+
+	public getIndexById(id: string){
+
+		var r = this.index[id];
+
+		if (!r) return null;
+
+		return this.records.indexOf(r);
+
+	}
+
+	public getRecordByIndex(index: number){
+
+		return this.records[index] || null;
 
 	}
 

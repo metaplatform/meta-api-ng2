@@ -10,7 +10,8 @@ import {EventEmitter} from './events';
 
 export class ApiRecord extends EventEmitter {
 
-	public data: Object = {};
+	public uri: string = null;
+	public data: any = {};
 
 	public loaded = false;
 	public deleted = false;
@@ -31,11 +32,21 @@ export class ApiRecord extends EventEmitter {
 		if (initialData)
 			this.setData(initialData, false);
 
+		this.updateUri();
+
+	}
+
+	private updateUri(){
+
+		this.uri = this.service + ":/" + this.endpoint + "/" + this.id;
+
 	}
 
 	public setId(id: string, reload: boolean = false){
 
 		this.id = id;
+
+		this.updateUri();
 
 		if (reload)
 			this.fetch();
@@ -65,7 +76,20 @@ export class ApiRecord extends EventEmitter {
 		console.log("REC UPDATE", update);
 
 		switch(update.op){
+
+			case 'delete':
+				this.deleted = true;
+				this.emit("delete");
+				break;
+
 			case 'update':
+
+				if(update.record._deleted){
+					this.deleted = true;
+					this.emit("delete");
+					break;	
+				}
+
 				if(this.modified){
 					this.emit("externalUpdate", update.record);
 				} else {
@@ -74,10 +98,6 @@ export class ApiRecord extends EventEmitter {
 				}
 				break;
 
-			case 'delete':
-				this.deleted = true;
-				this.emit("delete");
-				break;
 		}
 
 	}
@@ -155,6 +175,8 @@ export class ApiRecord extends EventEmitter {
 			r = this.client.call(this.service, this.endpoint, "create", this.data).then((res) => {
 
 				this.id = res.splitPath().pop();
+
+				this.updateUri();
 
 				this.loaded = true;
 				this.modified = false;

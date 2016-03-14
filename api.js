@@ -11,6 +11,8 @@ function __export(m) {
 __export(require("./lib/client"));
 __export(require("./lib/collection"));
 __export(require("./lib/record"));
+__export(require("./lib/storage"));
 __export(require("./lib/events"));
 __export(require("./lib/provider"));
+__export(require("./lib/types"));
 __export(require("./lib/utils"));

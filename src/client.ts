@@ -20,7 +20,7 @@ export class ApiClient extends EventEmitter {
 	private subscriptions = {};
 	private queueSubscriptions = {};
 
-	private connection: ApiConnector;
+	public connection: ApiConnector;
 
 	constructor(){
 		
@@ -107,6 +107,15 @@ export class ApiClient extends EventEmitter {
 		});
 
 	};
+
+	/*
+	 * Calls reconnect of connection
+	 */
+	public forceReconnect(){
+
+		this.connection.forceReconnect();
+
+	}
 
 	/*
 	 * Closes socket connection to broker - removes all subscriptions

@@ -18,7 +18,7 @@ export class ApiProvider {
 	public client: ApiClient;
 	public storage: ApiStorage;
 	public serverUrl: string;
-	public session: Object;
+	public session: any;
 
 	public connected: boolean = false;
 
@@ -68,6 +68,12 @@ export class ApiProvider {
 	public getRecord(service: string, endpoint: string, id: string = null, initialData: Object = null) {
 
 		return new ApiRecord(this.client, service, endpoint, id, initialData);
+
+	}
+
+	public forceReconnect(){
+
+		this.client.forceReconnect();
 
 	}
 

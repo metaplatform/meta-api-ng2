@@ -55,3 +55,13 @@ export class StorageReference {
 	}
 
 }
+
+export function ApiReferenceFromUri(uri: string) : ApiReference {
+
+	var parts = uri.split("://");
+
+	if (parts.length !== 2) throw new Error("Invalid URI");
+
+	return new ApiReference(parts[0], "/" + parts[1]);
+
+}
