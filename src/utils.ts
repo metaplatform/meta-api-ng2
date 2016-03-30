@@ -41,12 +41,12 @@ var clone = function(obj) {
 
 };
 
-var empty2null = function(data){
+var empty2null = function(data) : any {
 
     var r = {};
 
     for (var i in data)
-        if (data[i] == "")
+        if (data[i] === "")
             r[i] = null;
         else
             r[i] = data[i];

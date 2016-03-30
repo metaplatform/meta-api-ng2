@@ -50,6 +50,10 @@ export class EventEmitter {
 		this.off(eventName, handler);
 	}
 
+	public removeAllListeners(){
+		this._eventListeners = {};
+	}
+
 	public emit(eventName: string, ...args: any[]){
 
 		if (!this._eventListeners[eventName]) return;

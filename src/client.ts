@@ -21,6 +21,7 @@ export class ApiClient extends EventEmitter {
 	private queueSubscriptions = {};
 
 	public connection: ApiConnector;
+	public session: any;
 
 	constructor(){
 		
@@ -37,6 +38,7 @@ export class ApiClient extends EventEmitter {
 		});
 
 		this.connection.on("open", (session) => {
+			this.session = session;
 			this.emit("open", session);
 		});
 
@@ -92,13 +94,13 @@ export class ApiClient extends EventEmitter {
 	/*
 	 * Connects to remote broker
 	 */
-	public connect(brokerUrl: string, credentials: Object): Promise<{}> {
+	public connect(brokerUrl: string, credentialsCb: any): Promise<{}> {
 
 		return new Promise((resolve, reject) => {
 
 			try {
 
-				this.connection.connect(brokerUrl, credentials).then(resolve, reject);
+				this.connection.connect(brokerUrl, credentialsCb).then(resolve, reject);
 
 			} catch (e) {
 				reject(e);

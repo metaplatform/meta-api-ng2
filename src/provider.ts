@@ -11,6 +11,7 @@ import {ApiStorage} from './storage';
 
 import {ApiCollection} from './collection';
 import {ApiRecord} from './record';
+import {ApiReferenceFromUri} from './types';
 
 @Injectable()
 export class ApiProvider {
@@ -68,6 +69,31 @@ export class ApiProvider {
 	public getRecord(service: string, endpoint: string, id: string = null, initialData: Object = null) {
 
 		return new ApiRecord(this.client, service, endpoint, id, initialData);
+
+	}
+
+	public getRecordFromUri(uri: string, initalData: Object = null){
+
+		var ref = ApiReferenceFromUri(uri);
+		var path = ref.splitPath();
+		var id = path.pop();
+
+		return new ApiRecord(this.client, ref.service, path.join("/"), id, initalData);
+
+	}
+
+	public isRecordLocked(data: any){
+
+		var now = Math.round((new Date()).getTime() / 1000);
+
+		if (!data._locked) return;
+		if (data._locked.timestamp < now - 1800) return false;
+
+		var ref = this.client.session._ref;
+
+		if (data._locked.user == ref.service + ":/" + ref.endpoint) return false;
+		
+		return true;
 
 	}
 

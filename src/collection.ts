@@ -11,6 +11,7 @@ import {EventEmitter} from './events';
 export class ApiCollection extends EventEmitter {
 
 	private properties: Array<String> = [];
+	private resolve: Array<String> = ["*"];
 	private where: Object = {};
 	private sort: Object = {};
 	private skip: number = 0;
@@ -27,6 +28,7 @@ export class ApiCollection extends EventEmitter {
 	private appendMode: boolean = false;
 	private liveMode: boolean = true;
 	private clearRecords: boolean = false;
+	private _rid: number = 0;
 
 	public loaded = false;
 
@@ -212,7 +214,8 @@ export class ApiCollection extends EventEmitter {
 			where: this.where,
 			sort: this.sort,
 			skip: null,
-			limit: null
+			limit: null,
+			resolve: this.resolve
 		};
 
 		if (withPagination){
@@ -226,6 +229,9 @@ export class ApiCollection extends EventEmitter {
 
 	private fetchRecords(){
 
+		this._rid++;
+		var _rid = this._rid;
+
 		this.loaded = false;
 
 		if (this.liveHandler)
@@ -235,6 +241,8 @@ export class ApiCollection extends EventEmitter {
 		var liveQuery = this.createQuery(false);
 
 		this.client.call(this.service, this.endpoint, "query", query).then((res) => {
+
+			if (_rid != this._rid) return;
 
 			//Set counts
 			if (this.clearRecords) {
@@ -318,6 +326,8 @@ export class ApiCollection extends EventEmitter {
 
 		if (this.liveHandler)
 			this.liveHandler.unsubscribe();
+
+		this.removeAllListeners();
 
 	}
 

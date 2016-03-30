@@ -73,7 +73,7 @@ export class ApiConnector extends EventEmitter {
 			this.active = true;
 			this.connected = true;
 
-			this.sendRequest(PROTOCOL.commands.auth, this.credentials, (err, session) => {
+			this.sendRequest(PROTOCOL.commands.auth, this.credentials.call(), (err, session) => {
 
 				if(err){
 					this.close();
@@ -158,10 +158,10 @@ export class ApiConnector extends EventEmitter {
 	/*
 	 * Connects to remote broker
 	 */
-	public connect(brokerUrl: String, credentials: Object): Promise<{}> {
+	public connect(brokerUrl: String, credentialsCb: any): Promise<{}> {
 
 		this.brokerUrl = brokerUrl;
-		this.credentials = credentials;
+		this.credentials = credentialsCb;
 
 		if (this.reconnect)
 			this.active = true;
