@@ -60,6 +60,14 @@ export class ApiProvider {
 
 	}
 
+	public disconnect() {
+
+		this.connected = false;
+		this.session = null;
+		this.client.close();
+
+	}
+
 	public getCollection(service: string, endpoint: string){
 
 		return new ApiCollection(this.client, service, endpoint);
@@ -100,6 +108,17 @@ export class ApiProvider {
 	public forceReconnect(){
 
 		this.client.forceReconnect();
+
+	}
+
+	public can(service: string, endpoint: string, method: string){
+
+		return this.client.call("gate", "/acl", "test", {
+			prefix: "cube:call",
+			path: service + ":/" + endpoint,
+			method: method,
+			groups: this.session.groups
+		});
 
 	}
 

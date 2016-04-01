@@ -119,8 +119,6 @@ export class ApiRecord extends EventEmitter {
 		this.lockData = lockData;
 		this.locked = this.isLocked();
 
-		console.log("LOCK UPDATE", prevState, lockData);
-
 		if(this.locked != prevState.locked || (this.lockData && this.lockData.user != prevState.user)){
 
 			if (this.locked){
@@ -138,8 +136,6 @@ export class ApiRecord extends EventEmitter {
 	private applyUpdate(update: any){
 
 		if (!this.loaded) return;
-
-		console.log("REC UPDATE", update.op, update, this.locking);
 
 		switch(update.op){
 
@@ -301,8 +297,6 @@ export class ApiRecord extends EventEmitter {
 
 	public lock(force: boolean = false, setModified: boolean = false){
 
-		console.log("LOCK", this.locked, this.lockData);
-
 		if (!this.id) return Promise.reject(new Error("Record has no ID set."));
 
 		var now = Math.round((new Date()).getTime() / 1000);
@@ -326,8 +320,6 @@ export class ApiRecord extends EventEmitter {
 	}
 
 	public unlock(){
-
-		console.log("UNLOCK", this.locked, this.lockData, this.isLockedByMe());
 
 		if (!this.id) return Promise.reject(new Error("Record has no ID set."));
 		if (!this.lockData) return Promise.reject(new Error("Record is not locked."));
