@@ -382,6 +382,8 @@ export class ApiCollection extends EventEmitter {
 
 	public loadMore(){
 
+		if (!this.loaded) return;
+
 		this.page += 1;
 		this.skip = this.page * this.limit;
 
