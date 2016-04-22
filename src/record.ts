@@ -35,7 +35,8 @@ export class ApiRecord extends EventEmitter {
 
 		this.client.on("open", () => {
 			
-			this.fetch();
+			if(!this.modified)
+				this.fetch(true);
 
 		})
 
@@ -168,7 +169,7 @@ export class ApiRecord extends EventEmitter {
 
 	}
 
-	public fetch(): Promise<any> {
+	public fetch(onlyState: boolean = false): Promise<any> {
 
 		this.loaded = false;
 		this.notFound = false;
@@ -182,7 +183,9 @@ export class ApiRecord extends EventEmitter {
 
 			this.client.call(this.service, this.endpoint + "/" + this.id, "get", { resolve: ["*"] }).then((data) => {
 
-				this.setData(data, false);
+				if(!onlyState)
+					this.setData(data, false);
+				
 				this.loaded = true;
 				this.modified = false;
 
