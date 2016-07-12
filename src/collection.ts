@@ -380,6 +380,12 @@ export class ApiCollection extends EventEmitter {
 
 	}
 
+	public reload(){
+		this.clearRecords = true;
+		this.skip = 0;
+		this.fetchRecords();
+	}
+
 	public loadMore(){
 
 		if (!this.loaded) return;

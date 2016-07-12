@@ -10,6 +10,7 @@ import {ApiClient} from './client';
 import {ApiStorage} from './storage';
 
 import {ApiCollection} from './collection';
+import {ApiCounter} from './counter';
 import {ApiRecord} from './record';
 import {ApiReferenceFromUri} from './types';
 
@@ -71,6 +72,12 @@ export class ApiProvider {
 	public getCollection(service: string, endpoint: string){
 
 		return new ApiCollection(this.client, service, endpoint);
+
+	}
+
+	public getCounter(service: string, endpoint: string){
+
+		return new ApiCounter(this.client, service, endpoint);
 
 	}
 

@@ -7,6 +7,7 @@
 
 export * from "./src/client"
 export * from "./src/collection"
+export * from "./src/counter"
 export * from "./src/record"
 export * from "./src/storage"
 export * from "./src/events"
