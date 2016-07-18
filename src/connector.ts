@@ -21,7 +21,6 @@ export class ApiError extends Error {
 export class ApiConnector extends EventEmitter {
 
 	private activeSubscriptions = [];
-	private commandQueue = [];
 
 	private brokerUrl = null;
 	private credentials = null;
@@ -88,14 +87,6 @@ export class ApiConnector extends EventEmitter {
 					tasks.push(this.subscribe(this.activeSubscriptions[s]));
 
 				Promise.all(tasks).then(() => {
-
-					//Flush command queue
-					var msg = true;
-
-					while (msg) {
-						msg = this.commandQueue.shift();
-						this.ws.send(msg);
-					}
 
 					//Ready
 					this.emit("open", session);
@@ -209,7 +200,6 @@ export class ApiConnector extends EventEmitter {
 		this.active = false;
 
 		this.activeSubscriptions = [];
-		this.commandQueue = [];
 
 		this.emit("close");
 
@@ -236,7 +226,7 @@ export class ApiConnector extends EventEmitter {
 		if (this.connected)
 			this.ws.send(msg);
 		else
-			this.commandQueue.push(msg);
+			throw new Error("Disconnected, try it later.");
 
 	};
 
@@ -265,7 +255,7 @@ export class ApiConnector extends EventEmitter {
 		if (this.connected)
 			this.ws.send(msg);
 		else
-			this.commandQueue.push(msg);
+			throw new Error("Disconnected, try it later.");
 
 	};
 
